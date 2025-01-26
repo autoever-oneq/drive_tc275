@@ -146,7 +146,7 @@
            <Area></Area>
            <Load>true</Load>
            <OverrideMemArea>false</OverrideMemArea>
-           <Path>..\..\..\Debug\ASCLIN_Shell_UART_1_KIT_TC275_SB.elf</Path>
+           <Path>..\..\..\Debug\Drive_TC275_SB.elf</Path>
            <UseDefaultMSID>true</UseDefaultMSID>
            <MSID>
             <App>0x0</App>
@@ -242,7 +242,7 @@
            <Area></Area>
            <Load>true</Load>
            <OverrideMemArea>false</OverrideMemArea>
-           <Path>..\..\..\Debug\ASCLIN_Shell_UART_1_KIT_TC275_SB.elf</Path>
+           <Path>..\..\..\Debug\Drive_TC275_SB.elf</Path>
            <UseDefaultMSID>true</UseDefaultMSID>
            <MSID>
             <App>0x0</App>
@@ -582,6 +582,32 @@
     </Mode>
     <Op_System>
      <Debug>
+      <BPs>
+       <__.0>
+        <ActionEnabled>false</ActionEnabled>
+        <ActionParams></ActionParams>
+        <ActionScript></ActionScript>
+        <ActionShow>false</ActionShow>
+        <Condition>false</Condition>
+        <Count>0</Count>
+        <Enabled>true</Enabled>
+        <Expression></Expression>
+        <Location>&quot;..\..\..\Libraries\iLLD\TC27D\Tricore\Qspi\SpiMaster\IfxQspi_SpiMaster.c&quot;::290</Location>
+        <ProcessFilter></ProcessFilter>
+       </__.0>
+       <__.1>
+        <ActionEnabled>false</ActionEnabled>
+        <ActionParams></ActionParams>
+        <ActionScript></ActionScript>
+        <ActionShow>false</ActionShow>
+        <Condition>false</Condition>
+        <Count>0</Count>
+        <Enabled>true</Enabled>
+        <Expression></Expression>
+        <Location>&quot;..\..\..\Rc522App.c&quot;::170</Location>
+        <ProcessFilter></ProcessFilter>
+       </__.1>
+      </BPs>
       <Processes>
        <__.0>
         <URL>App/SMP</URL>

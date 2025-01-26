@@ -134,6 +134,9 @@ void initQSPI1MasterChannel(void)
     IfxQspi_SpiMaster_initChannelConfig(&spiMasterChannelConfig, &g_qspi.spiMaster);
 
     spiMasterChannelConfig.base.baudrate = MASTER_CHANNEL_BAUDRATE;     /* Set SCLK frequency to 1 MHz              */
+    spiMasterChannelConfig.base.mode.shiftClock = SpiIf_ShiftClock_shiftTransmitDataOnTrailingEdge;
+//    spiMasterChannelConfig.base.mode.csLeadDelay = SpiIf_SlsoTiming_7;
+//    spiMasterChannelConfig.base.mode.csTrailDelay = SpiIf_SlsoTiming_7;
 
     /* Select the port pin for the Chip Select signal */
     const IfxQspi_SpiMaster_Output qspi1SlaveSelect = {                 /* QSPI1 Master selects the QSPI3 Slave     */
@@ -223,5 +226,5 @@ uint8_t readRc522Byte(uint8_t reg) {
     print("SPI recv> ", 10);
     printUart(&result[0], &dataLen);
 
-    return result[1];
+    return result[0];
 }

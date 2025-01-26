@@ -90,10 +90,6 @@ static IfxAsclin_Asc   asclin0;                                                 
 static IfxAsclin_Asc   asclin1;                                                   /* ASCLIN module object                 */
 static IfxAsclin_Asc   asclin2;                                                   /* ASCLIN module object                 */
 
-static const txBufferSize = ASC_TX_BUFFER_SIZE;
-static const rxBufferSize = ASC_RX_BUFFER_SIZE;
-
-
 UartInterface_t uartInterfaces[] = {
         {&g_asclin, &MODULE_ASCLIN3, ISR_PRIORITY_ASCLIN_TX, ISR_PRIORITY_ASCLIN_RX, &IfxAsclin3_RXD_P32_2_IN, &IfxAsclin3_TX_P15_7_OUT},
         {&asclin0, &MODULE_ASCLIN1, ISR_PRIORITY_ASCLIN_TX0, ISR_PRIORITY_ASCLIN_RX0, &ASCLIN1_RX0, &ASCLIN1_TX0},

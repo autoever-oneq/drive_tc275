@@ -31,10 +31,14 @@
 /*********************************************************************************************************************/
 #include "Rc522App.h"
 #include "CommunicationApp.h"
+#include "IfxPort.h"
+#include "IfxPort_PinMap.h"
+#include "Driver_Stm.h"
 
 /*********************************************************************************************************************/
 /*------------------------------------------------------Macros-------------------------------------------------------*/
 /*********************************************************************************************************************/
+#define MFRC522_MAX_LEN     (4)
 
 /*********************************************************************************************************************/
 /*-------------------------------------------------Global variables--------------------------------------------------*/
@@ -144,23 +148,47 @@ enum PICC_Command {
 /*------------------------------------------------Function Prototypes------------------------------------------------*/
 /*********************************************************************************************************************/
 void initRc522(void);
-void readUID(void);
+void readUID(uint8_t *uid);
+boolean isNewCardPresent(void);
+void haltRc522(void);
+void antiCollRc522(uint8_t* serNum);
+void transceiveRc522(
+        uint8_t* sendData,
+        uint8_t sendLen,
+        uint8_t* backData,
+        uint16_t* backLen);
+void clearBitRc522(uint8_t reg, uint8_t mask);
+void setBitRc522(uint8_t reg, uint8_t mask);
+void selfTestRc522(void);
 
 /*********************************************************************************************************************/
 /*---------------------------------------------Function Implementations----------------------------------------------*/
 /*********************************************************************************************************************/
 void initRc522(void) {
+//    IfxPort_setPinModeInput(IfxPort_P02_7.port, IfxPort_P02_7.pinIndex, IfxPort_InputMode_noPullDevice);
+    IfxPort_setPinModeOutput(IfxPort_P02_7.port, IfxPort_P02_7.pinIndex, IfxPort_OutputMode_pushPull,
+            IfxPort_OutputIdx_general);
+    IfxPort_setPinLow(IfxPort_P02_7.port, IfxPort_P02_7.pinIndex);
+    delay(50);
+
+    IfxPort_setPinHigh(IfxPort_P02_7.port, IfxPort_P02_7.pinIndex);
+    delay(50);
+
+    readRc522Byte(0x37 << 1);
+
     //Timer: TPrescaler*TreloadVal/6.78MHz = 24ms
-    writeRc522Reg(TModeReg, 0x8D);      //Tauto=1; f(Timer) = 6.78MHz/TPreScaler
-    writeRc522Reg(TPrescalerReg, 0x3E); //TModeReg[3..0] + TPrescalerReg
-    writeRc522Reg(TReloadRegL, 30);
-    writeRc522Reg(TReloadRegH, 0);
+    writeRc522Reg(TModeReg, 0x80);      //Tauto=1; f(Timer) = 6.78MHz/TPreScaler
+    writeRc522Reg(TPrescalerReg, 0xA9); //TModeReg[3..0] + TPrescalerReg
+    writeRc522Reg(TReloadRegL, 0x03);
+    writeRc522Reg(TReloadRegH, 0xE8);
 
     writeRc522Reg(TxASKReg, 0x40);     // force 100% ASK modulation
     writeRc522Reg(ModeReg, 0x3D);       // CRC Initial value 0x6363
 
     uint8_t txControlRegister = readRc522Byte(TxControlReg);
     writeRc522Reg(TxControlReg, txControlRegister | 0x03);
+
+    readRc522Byte(0x37 << 1);
     /*
     // Step 1: 소프트 리셋
     writeRc522Reg(CommandReg, PCD_SoftReset);  // Soft Reset 명령 실행
@@ -200,7 +228,16 @@ void initRc522(void) {
     */
 }
 
-void readUID(void) {
+void readUID(uint8_t *uid) {
+    //Find cards, return card type
+    uint16_t backBits;
+    writeRc522Reg(BitFramingReg, 0x07);
+    uid[0] = PICC_CMD_REQA;
+    transceiveRc522(uid, 1, uid, &backBits);
+    delay(1);
+    antiCollRc522(uid);
+    haltRc522();      //Command card into hibernation
+
 //    uint8_t tmp;
 //    writeRc522Reg(BitFramingReg, 0x07);     //TxLastBists = BitFramingReg[2..0]
 //
@@ -357,4 +394,220 @@ void readUID(void) {
     int printLen = length;
     printUart(uid, &printLen);
     */
+}
+
+
+boolean isNewCardPresent(void) {
+
+    uint8_t bufferATQA[2];
+    uint8_t bufferSize = sizeof(bufferATQA);
+
+    // Reset baud rates
+    writeRc522Reg(TxModeReg, 0x00);
+    writeRc522Reg(RxModeReg, 0x00);
+
+    // Reset ModWidthReg
+    writeRc522Reg(ModWidthReg, 0x26);
+
+//    PCD_ClearRegisterBitMask(CollReg, 0x80);
+    clearBitRc522(CollReg, 0x80);
+
+
+//    MFRC522::StatusCode result = PICC_RequestA(bufferATQA, &bufferSize);
+//    ->
+//    PICC_REQA_or_WUPA(PICC_CMD_REQA, bufferATQA, bufferSize);
+//    ->
+//    byte validBits;
+//    MFRC522
+//    ::StatusCode status;
+//
+//    if (bufferATQA == nullptr || *bufferSize < 2)
+//    { // The ATQA response is 2 bytes long.
+//        return STATUS_NO_ROOM;
+//    }
+//    PCD_ClearRegisterBitMask(CollReg, 0x80);        // ValuesAfterColl=1 => Bits received after collision are cleared.
+//    validBits = 7; // For REQA and WUPA we need the short frame format - transmit only 7 bits of the last (and only) byte. TxLastBits = BitFramingReg[2..0]
+//    status = PCD_TransceiveData(&command, 1, bufferATQA, bufferSize, &validBits);
+//    if (status != STATUS_OK)
+//    {
+//        return status;
+//    }
+//    if (*bufferSize != 2 || validBits != 0)
+//    {       // ATQA must be exactly 16 bits.
+//        return STATUS_ERROR;
+//    }
+//    return STATUS_OK;
+}
+
+void haltRc522(void) {
+    uint8_t unLen;
+    uint8_t buff[2];
+
+    buff[0] = PICC_CMD_HLTA;
+    buff[1] = 0;
+
+    transceiveRc522(buff, 2, buff, &unLen);
+}
+
+void antiCollRc522(uint8_t* serNum) {
+      uint8_t i;
+      uint8_t serNumCheck = 0;
+      uint16_t unLen;
+
+      writeRc522Reg(BitFramingReg, 0x00);    //TxLastBists = BitFramingReg[2..0]
+
+      serNum[0] = PICC_CMD_SEL_CL1;
+      serNum[1] = 0x20;
+      transceiveRc522(serNum, 2, serNum, &unLen);
+}
+
+void transceiveRc522(
+        uint8_t* sendData,
+        uint8_t sendLen,
+        uint8_t* backData,
+        uint16_t* backLen)
+{
+    uint8_t irqEn = 0x77;
+    uint8_t waitIRq = 0x30;
+    uint8_t lastBits;
+    uint8_t n;
+    uint16_t i;
+
+    writeRc522Reg(ComIEnReg, irqEn | 0x80);
+    clearBitRc522(ComIrqReg, 0x80);
+    setBitRc522(FIFOLevelReg, 0x80);
+
+    writeRc522Reg(CommandReg, PCD_Idle);
+
+    //Writing data to the FIFO
+    for (i = 0; i < sendLen; i++)
+    {
+        writeRc522Reg(FIFODataReg, sendData[i]);
+    }
+
+    //Execute the command
+    writeRc522Reg(CommandReg, PCD_Transceive);
+    setBitRc522(BitFramingReg, 0x80);   //StartSend=1,transmission of data starts
+
+
+    //Waiting to receive data to complete
+    i = 2;  //i according to the clock frequency adjustment, the operator M1 card maximum waiting time 25ms???
+    do
+    {
+        //CommIrqReg[7..0]
+        //Set1 TxIRq RxIRq IdleIRq HiAlerIRq LoAlertIRq ErrIRq TimerIRq
+        n = readRc522Byte(ComIrqReg);
+        i--;
+    }while ((i != 0) && !(n & 0x01) && !(n & waitIRq));
+
+    clearBitRc522(BitFramingReg, 0x80);     //StartSend=0
+
+    if (i != 0)
+    {
+        if (!(readRc522Byte(ErrorReg) & 0x1B))
+        {
+//            status = true;
+            if (n & irqEn & 0x01)
+            {
+//                status = false;
+            }
+
+            n = readRc522Byte(FIFOLevelReg);
+            uint8_t l = n;
+            lastBits = readRc522Byte(ControlReg) & 0x07;
+            if (lastBits)
+            {
+                *backLen = (n - 1) * 8 + lastBits;
+            }
+            else
+            {
+                *backLen = n * 8;
+            }
+
+            if (n == 0)
+            {
+                n = 1;
+            }
+            if (n > MFRC522_MAX_LEN)
+            {
+                n = MFRC522_MAX_LEN;
+            }
+
+            //Reading the received data in FIFO
+            for (i = 0; i < n; i++)
+            {
+                uint8_t d = readRc522Byte(FIFODataReg);
+                backData[i] = d;
+            }
+        }
+        else
+        {
+//            status = false;
+        }
+    }
+
+}
+
+void clearBitRc522(uint8_t reg, uint8_t mask) {
+    uint8_t temp = readRc522Byte(reg);
+    writeRc522Reg(reg, temp & (~mask));
+}
+
+void setBitRc522(uint8_t reg, uint8_t mask) {
+    uint8_t temp = readRc522Byte(reg);
+    writeRc522Reg(reg, temp | mask);
+}
+
+void selfTestRc522(void) {
+    writeRc522Reg(CommandReg, PCD_SoftReset);   // Issue the SoftReset command.
+    // The datasheet does not mention how long the SoftRest command takes to complete.
+    // But the MFRC522 might have been in soft power-down mode (triggered by bit 4 of CommandReg)
+    // Section 8.8.2 in the datasheet says the oscillator start-up time is the start up time of the crystal + 37,74μs. Let us be generous: 50ms.
+    uint8_t count = 0;
+    do
+    {
+        // Wait for the PowerDown bit in CommandReg to be cleared (max 3x50ms)
+        delay(50);
+    }while ((readRc522Byte(CommandReg) & (1 << 4)) && (++count) < 3);
+
+    // 2. Clear the internal buffer by writing 25 bytes of 00h
+    uint8_t ZEROES[25] = {0x00};
+    writeRc522Reg(FIFOLevelReg, 0x80);      // flush the FIFO buffer
+    for (int i = 0; i < 25; i++) {
+        writeRc522Reg(FIFODataReg, 0); // write 25 bytes of 00h to FIFO
+    }
+    writeRc522Reg(CommandReg, PCD_Mem);     // transfer to internal buffer
+
+    // 3. Enable self-test
+    writeRc522Reg(0x36 << 1, 0x09);
+
+    // 4. Write 00h to FIFO buffer
+    writeRc522Reg(FIFODataReg, 0x00);
+
+    // 5. Start self-test by issuing the CalcCRC command
+    writeRc522Reg(CommandReg, PCD_CalcCRC);
+
+    // 6. Wait for self-test to complete
+    uint8 n;
+    for (uint8_t i = 0; i < 0xFF; i++)
+    {
+        n = readRc522Byte(FIFOLevelReg);
+        if (n >= 64)
+        {
+            break;
+        }
+    }
+    writeRc522Reg(CommandReg, PCD_Idle);        // Stop calculating CRC for new content in the FIFO.
+
+    // 7. Read out resulting 64 bytes from the FIFO buffer.
+    uint8_t result[64];
+    for (int i = 0; i < 64; i++){
+        readRc522Byte(FIFODataReg);
+    }
+    // Auto self-test done
+    // Reset AutoTestReg register to be 0 again. Required for normal operation.
+    writeRc522Reg(0x36 << 1, 0x00);
+
+    // Determine firmware version (see section 9.3.4.8 in spec)
+    uint8_t version = writeRc522Reg(0x37 << 1);
 }

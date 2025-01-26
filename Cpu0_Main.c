@@ -70,10 +70,11 @@ int core0_main(void)
      initCommunicationApp();
      initQSPI();
      initRc522();
+//     selfTestRc522();
 
     while(1)
     {
-        schedule();
+//        schedule();
     }
     return (1);
 }
@@ -96,6 +97,12 @@ void schedule(void) {
 
     if (stSchedulingInfo.u8nuScheduling1000msFlag == 1)
     {
+        uint8_t* uid[0x10] = { 0, };
+        readUID(uid);
+
+        print("HEREWEGO> ", 10);
+        int a= 4;
+        printUart(uid, &a);
         stSchedulingInfo.u8nuScheduling1000msFlag = 0;
     }
 }
